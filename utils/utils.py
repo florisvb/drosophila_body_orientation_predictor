@@ -517,7 +517,7 @@ def convex_opt_heading_correction(fly_trajectory_and_body: pd.DataFrame) -> pd.D
     thrust_mag_norm = thrust_mag / thrust_mag.mean()
     delta = _angle_diff(heading_angle, thrust_angle)
 
-    L = 1 * cvxpy.tv(heading_angle_unwrapped + np.pi * k) + 5 * cvxpy.norm1(thrust_mag_norm * (delta + np.pi * k))
+    L = 1 * cvxpy.tv(heading_angle_unwrapped + np.pi * k) + 5 * cvxpy.norm1(cvxpy.multiply(thrust_mag_norm, delta + np.pi * k))
     cvxpy.Problem(cvxpy.Minimize(L), [-1 <= k, k <= 1]).solve(solver='MOSEK')
 
     fly_trajectory_and_body["heading_angle"] = np.arctan2(
