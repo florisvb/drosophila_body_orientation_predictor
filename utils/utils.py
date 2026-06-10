@@ -930,10 +930,10 @@ def plot_trajectory(
     """
     ax.set_aspect('equal')
     padding = 0.01
-    ax.set_xlim(fly_trajectory_and_body['position_x'].min() - padding,
-                fly_trajectory_and_body['position_x'].max() + padding)
-    ax.set_ylim(fly_trajectory_and_body['position_y'].min() - padding,
-                fly_trajectory_and_body['position_y'].max() + padding)
+    ax.set_xlim(np.nanmin(fly_trajectory_and_body['position_x']) - padding,
+                np.nanmax(fly_trajectory_and_body['position_x']) + padding)
+    ax.set_ylim(np.nanmin(fly_trajectory_and_body['position_y']) - padding,
+                np.nanmax(fly_trajectory_and_body['position_y']) + padding)
     ax.plot(fly_trajectory_and_body['position_x'].values,
             fly_trajectory_and_body['position_y'].values,
             color='red', label='Trajectory', zorder=1)
