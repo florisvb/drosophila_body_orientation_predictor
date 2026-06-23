@@ -81,7 +81,7 @@ pip install -r requirements.txt
 
 ### 3b. Download the external evaluation data
 
-Orco-mutant laminar-wind trajectories used for heading-prediction evaluation are archived separately on [Dryad](https://datadryad.org/dataset/doi:10.5061/dryad.zw3r228fw). Download `orco_laminar1.csv`, `orco_traj2.csv`, and `orco_traj3.csv` from `trajectories_for_figures/` and place them in `experimentaldata/external/`:
+Orco-->CsChrimson laminar-wind trajectories used for heading-prediction evaluation are archived separately on [Dryad](https://datadryad.org/dataset/doi:10.5061/dryad.zw3r228fw). Download `orco_laminar1.csv`, `orco_traj2.csv`, and `orco_traj3.csv` from `trajectories_for_figures/` and place them in `experimentaldata/external/`:
 
 ```
 experimentaldata/external/
