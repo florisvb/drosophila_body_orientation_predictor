@@ -4,20 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Environment Setup
 
-The project uses a Python virtual environment at `.venv/`. Activate it before running notebooks:
+Requires **Python 3.12**. The project uses a virtual environment at `.venv/`:
+
 ```bash
+python3.12 -m venv .venv
 source .venv/bin/activate
-```
-
-Install dependencies:
-```bash
 pip install -r requirements.txt
-```
-
-Run JupyterLab:
-```bash
 jupyter lab
 ```
+
+The convex-optimisation heading correction requires a valid MOSEK license at `~/mosek/mosek.lic`. The simpler `naive_heading_correction` does not require MOSEK.
 
 ## Data
 
@@ -45,19 +41,23 @@ This project predicts *Drosophila* body heading angles from flight trajectory da
 
 ### Notebooks (primary workflow)
 
+Run in order:
+
 - **`notebooks/data_pipeline.ipynb`** — Full preprocessing pipeline: merges raw Parquet data across wind speeds (30/40/60 cm/s), corrects 180° heading ambiguities, filters and smooths trajectories, and saves the final dataset to `pipelinedata/06_final/`.
-- **`notebooks/model_training.ipynb`** — Loads preprocessed data from `pipelinedata/06_final/`, constructs time-delay–embedded features, runs a hyperparameter grid search, trains the Keras neural network, saves `models/model.keras`, and evaluates predictions on both the training dataset and an external dataset (`pipelinedata/external/`).
+- **`notebooks/model_training.ipynb`** — Loads preprocessed data from `pipelinedata/06_final/`, constructs time-delay–embedded features, runs a hyperparameter grid search, trains the Keras neural network, saves `models/drosophila_body_orientation_predictor.keras`, and evaluates predictions on both the training dataset and an external dataset (`pipelinedata/external/`).
 
 ### Python modules (in `utils/`)
 
-- **`utils/utils.py`** — All shared functions: data loading/merging, kinematic augmentation, heading correction (`naive_heading_correction`, `convex_opt_heading_correction`), smoothing (`smooth_trajectory`), time-delay embedding (`augment_with_time_delay_embedding`), trajectory visualisation (`plot_trajectory`, `plot_trajectory_with_predicted_heading`), and model utilities (`create_model`, `custom_density_plots`).
-- **`utils/fly_plot_lib_plot.py`** — Wrapper around `FlyPlotLib` for trajectory visualisation with heading arrows.
+Both notebooks add `../utils` to `sys.path` so `from utils import ...` resolves correctly.
 
-Both notebooks add `../utils` to `sys.path` at startup so `from utils import ...` resolves correctly.
+- **`utils/utils.py`** — All shared functions. Two parallel APIs for the same computations:
+  - **Top-level functions** (used by the notebooks): `naive_heading_correction`, `convex_opt_heading_correction`, `augment_fly_trajectory`, `smooth_trajectory`, `augment_with_time_delay_embedding`, `plot_trajectory`, `plot_trajectory_with_predicted_heading`, `create_model`, `custom_density_plots`.
+  - **`compute` class** (static methods): `compute.angular_velocity`, `compute.linear_acceleration`, `compute.thrust`, `compute.heading_angle_corrected`, `compute.heading_angle_convex_opt` — lower-level, return arrays rather than augmented DataFrames.
+- **`utils/fly_plot_lib_plot.py`** — Wrapper around `FlyPlotLib` for trajectory visualisation with heading arrows.
 
 ### Pipeline data stages (`pipelinedata/`)
 
-Stages 01–06 are written by `data_pipeline.ipynb`; stages 07–08 are written by `model_training.ipynb`:
+Stages 01–06 are written by `data_pipeline.ipynb`; stages 07–08 are written by `model_training.ipynb`. `figures/` and `pipelinedata/` are generated outputs and are not tracked in git.
 
 | Directory | Written by | Contents |
 |---|---|---|
@@ -73,19 +73,19 @@ Stages 01–06 are written by `data_pipeline.ipynb`; stages 07–08 are written 
 
 ### Trained models (`models/`)
 
-- **`models/model.keras`** — Base model trained on Floris et al. data.
-- **`models/model_CEM_all-angle-rotate.keras`** — Variant with rotation augmentation to remove wind-direction bias.
+- **`models/drosophila_body_orientation_predictor.keras`** — Canonical published model trained on Floris et al. data.
+- **`models/model_CEM_all-angle-rotate.keras`** — Variant trained with `wind_augment=True` in `augment_with_time_delay_embedding`, which applies random wind-direction rotations to remove wind-direction bias.
 
 ### Key data pipeline steps
 
 1. **Raw data**: Parquet files for trajectory, body orientation, and key table per wind speed.
 2. **Merging**: Join trajectory + body orientation via key table; concatenate across wind speeds.
-3. **Augmentation**: Compute groundspeed, airspeed, thrust, linear acceleration, heading components (cos/sin).
-4. **Heading correction**: Fix 180° ambiguities using `naive_heading_correction` (np.unwrap) then `convex_opt_heading_correction` (cvxpy + MOSEK).
+3. **Augmentation**: Compute groundspeed, airspeed, thrust (mass=0.25e-6 kg, dragcoeff=mass/0.170), linear acceleration, heading components (cos/sin). Differentiation uses `pynumdiff` Savitzky-Golay with params `[2, 10, 10]`.
+4. **Heading correction**: Fix 180° ambiguities using `naive_heading_correction` (np.unwrap) then `convex_opt_heading_correction` (cvxpy + MOSEK, minimizes total variation + thrust-alignment).
 5. **Filtering**: Remove trajectories with residual π-flips above threshold.
-6. **Smoothing**: Unwrap heading signal then apply Savitzky–Golay filter.
+6. **Smoothing**: Unwrap heading signal then apply Savitzky–Golay filter (default params `[1, 5, 5]`).
 7. **Time-delay embedding**: `augment_with_time_delay_embedding` creates lookback window features (window=4) across [groundspeed, groundspeed_angle, airspeed, airspeed_angle, thrust, thrust_angle] → 24 input features.
-8. **Model**: Keras neural network predicts [heading_angle_x, heading_angle_y] (unit vector components); heading angle recovered via `arctan2`.
+8. **Model**: Keras fully-connected network (default: 1 hidden layer, 50 neurons, ReLU, `UnitNormalization` output layer) predicts [heading_angle_x, heading_angle_y] (unit vector components); heading angle recovered via `arctan2`.
 
 ### Coordinate frame convention
 
@@ -95,7 +95,3 @@ The model was trained with:
 - Positive y = crosswind such that x × y points out of screen
 
 External data must be transformed to match this frame before prediction.
-
-### MOSEK license
-
-The convex optimisation heading correction (`convex_opt_heading_correction`) requires a valid MOSEK license at `~/mosek/mosek.lic`. The simpler `naive_heading_correction` does not require MOSEK.
